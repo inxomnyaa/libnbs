@@ -23,8 +23,9 @@ namespace xenialdan\libnbs;
 
 
 use pocketmine\nbt\NBT;
+use pocketmine\Server;
 
-abstract class NBSFile extends NBT{
+class NBSFile extends NBT{
 	const INSTRUMENT_PIANO = 0;
 	const INSTRUMENT_DOUBLE_BASS = 1;
 	const INSTRUMENT_BASS_DRUM = 2;
@@ -37,7 +38,7 @@ abstract class NBSFile extends NBT{
 	const INSTRUMENT_XYLOPHONE = 9;
 
 	public $length = 0;
-	public $height = 0;
+	public $layers = 0;
 	public $name = "";
 	public $author = "";
 	public $originalAuthor = "";
@@ -53,16 +54,19 @@ abstract class NBSFile extends NBT{
 	public $blocksRemoved = 0;
 	public $importedFileName = "";
 
-	public static $notes = [];
+	/** @var Note[] */
+	public $notes = [];
+	/** @var Layer[] */
+	public $layerInfo = [];
 
-	public function __construct($path){
+	public function __construct(string $path){
 		parent::__construct(self::LITTLE_ENDIAN);
 		$fopen = fopen($path, "r");
 		$this->buffer = fread($fopen, filesize($path));
 		fclose($fopen);
 		### HEADER ###
 		$this->length = $this->getShort();
-		$this->height = $this->getShort();
+		$this->layers = $this->getShort();
 		$this->name = $this->getString();
 		$this->author = $this->getString();
 		$this->originalAuthor = $this->getString();
@@ -78,38 +82,93 @@ abstract class NBSFile extends NBT{
 		$this->blocksRemoved = $this->getInt();
 		$this->importedFileName = $this->getString();
 		### DATA ###
+		/** @var Note[] $noteblocks */
+		$notes = [];
+		/** @var int[] $instrumentcount */
+		$instrumentcount = [];
+		/** @var int[] $layercount */
+		$layercount = [];
+
 		$tick = -1;
 		$jumps = 0;
 		while (true){
 			$jumps = $this->getShort();
-			if ($jumps == 0) break;
+			if ($jumps === 0) break;
 			$tick += $jumps;
 			$layer = -1;
 			while (true){
 				$jumps = $this->getShort();
-				if ($jumps == 0) break;
+				if ($jumps === 0) break;
 				$layer += $jumps;
 				$instrument = $this->getByte();
 				$key = $this->getByte();
-				self::addNoteBlock($tick, $layer, $instrument, $key);
+				$notes[] = new Note($tick, $layer, $instrument, $key);
+				if (isset($instrumentcount[$instrument])){
+					$instrumentcount[$instrument]++;
+				} else{
+					$instrumentcount[$instrument] = 1;
+				}
+				if ($layer < $this->layers){
+					if (isset($layercount[$layer])){
+						$layercount[$layer]++;
+					} else{
+						$layercount[$layer] = 1;
+					}
+				};
 			}
 		}
-		//TODO read further to figure out layer volume
+
+		$this->notes = $notes;
+
+		Server::getInstance()->getLogger()->debug("Found " . count($notes) . " notes!");
+		Server::getInstance()->getLogger()->debug("Piano: " . ($instrumentcount[self::INSTRUMENT_PIANO] ?? 0));
+		Server::getInstance()->getLogger()->debug("Double Bass: " . ($instrumentcount[self::INSTRUMENT_DOUBLE_BASS] ?? 0));
+		Server::getInstance()->getLogger()->debug("Bass Drum: " . ($instrumentcount[self::INSTRUMENT_BASS_DRUM] ?? 0));
+		Server::getInstance()->getLogger()->debug("Snare Drum: " . ($instrumentcount[self::INSTRUMENT_SNARE] ?? 0));
+		Server::getInstance()->getLogger()->debug("Click: " . ($instrumentcount[self::INSTRUMENT_CLICK] ?? 0));
+		Server::getInstance()->getLogger()->debug("Guitar: " . ($instrumentcount[self::INSTRUMENT_GUITAR] ?? 0));
+		Server::getInstance()->getLogger()->debug("Flute: " . ($instrumentcount[self::INSTRUMENT_FLUTE] ?? 0));
+		Server::getInstance()->getLogger()->debug("Bell: " . ($instrumentcount[self::INSTRUMENT_BELL] ?? 0));
+		Server::getInstance()->getLogger()->debug("Chime: " . ($instrumentcount[self::INSTRUMENT_CHIME] ?? 0));
+		Server::getInstance()->getLogger()->debug("Xylophone: " . ($instrumentcount[self::INSTRUMENT_XYLOPHONE] ?? 0));
+
+		### LAYER INFO ###
+		for ($i = 0; $i < $this->layers; $i++){
+			$layer = new Layer($i + 1, $this->getString(), $this->getByte(), $layercount[$i] ?? 0);
+			$this->layerInfo[] = $layer;
+			Server::getInstance()->getLogger()->debug("Layer " . $layer->id . ", Name: " . $layer->name . ", Volume: " . $layer->volume . "%, Note blocks: " . $layer->notes);
+		}
+
+		### CUSTOM INSTRUMENTS - UNUSED ###
 	}
 
-	public static function addNoteBlock($tick, $layer, $instrument, $key){
-		self::$notes[$tick] = [$instrument, $key, $layer];
+	public function getString(bool $network = false){
+		return $this->get(unpack("I", $this->get(4))[1]);
 	}
 
-	public static function getNotes(){
-		return self::$notes;
+	/**
+	 * @return Note[]
+	 */
+	public function getNotes(){
+		return $this->notes;
 	}
 
 	/**
 	 * @param int $tick
-	 * @return int the note or -1 if no note exists at that tick
+	 * @return Note[]
 	 */
-	public static function getNoteAtTick(int $tick){
-		return self::$notes[$tick]??-1;
+	public function getNotesAtTick(int $tick){
+		$notes = [];
+		foreach ($this->notes as $note){
+			if ($note->tick === $tick) $notes[] = $note;
+		}
+		return $notes;
+	}
+
+	/**
+	 * @return Layer[]
+	 */
+	public function getLayerInfo(): array{
+		return $this->layerInfo;
 	}
 }
