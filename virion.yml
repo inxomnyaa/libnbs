@@ -1,5 +1,5 @@
 name: libnbs
-version: 1.0.0
+version: 2.0.0
 antigen: xenialdan\libnbs
 api: [3.0.0-ALPHA9,3.0.0-ALPHA10]
 php: [7.2]

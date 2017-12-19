@@ -24,8 +24,9 @@ namespace xenialdan\libnbs;
 
 use pocketmine\nbt\NBT;
 use pocketmine\Server;
+use pocketmine\utils\Binary;
 
-class NBSFile extends NBT{
+class NBSFile{
 	const INSTRUMENT_PIANO = 0;
 	const INSTRUMENT_DOUBLE_BASS = 1;
 	const INSTRUMENT_BASS_DRUM = 2;
@@ -36,6 +37,11 @@ class NBSFile extends NBT{
 	const INSTRUMENT_BELL = 7;
 	const INSTRUMENT_CHIME = 8;
 	const INSTRUMENT_XYLOPHONE = 9;
+
+	public $buffer;
+	public $offset;
+	public $endianness = NBT::LITTLE_ENDIAN;
+	private $data;
 
 	public $length = 0;
 	public $layers = 0;
@@ -60,7 +66,6 @@ class NBSFile extends NBT{
 	public $layerInfo = [];
 
 	public function __construct(string $path){
-		parent::__construct(self::LITTLE_ENDIAN);
 		$fopen = fopen($path, "r");
 		$this->buffer = fread($fopen, filesize($path));
 		fclose($fopen);
@@ -142,10 +147,6 @@ class NBSFile extends NBT{
 		### CUSTOM INSTRUMENTS - UNUSED ###
 	}
 
-	public function getString(bool $network = false){
-		return $this->get(unpack("I", $this->get(4))[1]);
-	}
-
 	/**
 	 * @return Note[]
 	 */
@@ -170,5 +171,35 @@ class NBSFile extends NBT{
 	 */
 	public function getLayerInfo(): array{
 		return $this->layerInfo;
+	}
+
+	public function get($len){
+		if($len < 0){
+			$this->offset = strlen($this->buffer) - 1;
+			return "";
+		}elseif($len === true){
+			return substr($this->buffer, $this->offset);
+		}
+
+		return $len === 1 ? $this->buffer{$this->offset++} : substr($this->buffer, ($this->offset += $len) - $len, $len);
+	}
+
+	public function getString(bool $network = false){
+		return $this->get(unpack("I", $this->get(4))[1]);
+	}
+
+	public function getShort() : int{
+		return $this->endianness === NBT::BIG_ENDIAN ? Binary::readShort($this->get(2)) : Binary::readLShort($this->get(2));
+	}
+
+	public function getByte() : int{
+		return Binary::readByte($this->get(1));
+	}
+
+	public function getInt(bool $network = false) : int{
+		if($network === true){
+			return Binary::readVarInt($this->buffer, $this->offset);
+		}
+		return $this->endianness === NBT::BIG_ENDIAN ? Binary::readInt($this->get(4)) : Binary::readLInt($this->get(4));
 	}
 }
