@@ -22,7 +22,6 @@
 namespace xenialdan\libnbs;
 
 
-use pocketmine\nbt\NBT;
 use pocketmine\Server;
 use pocketmine\utils\Binary;
 
@@ -40,7 +39,6 @@ class NBSFile{
 
 	public $buffer;
 	public $offset;
-	public $endianness = NBT::LITTLE_ENDIAN;
 	private $data;
 
 	public $length = 0;
@@ -189,7 +187,7 @@ class NBSFile{
 	}
 
 	public function getShort() : int{
-		return $this->endianness === NBT::BIG_ENDIAN ? Binary::readShort($this->get(2)) : Binary::readLShort($this->get(2));
+        return Binary::readLShort($this->get(2));
 	}
 
 	public function getByte() : int{
@@ -200,6 +198,6 @@ class NBSFile{
 		if($network === true){
 			return Binary::readVarInt($this->buffer, $this->offset);
 		}
-		return $this->endianness === NBT::BIG_ENDIAN ? Binary::readInt($this->get(4)) : Binary::readLInt($this->get(4));
+        return Binary::readLInt($this->get(4));
 	}
 }
