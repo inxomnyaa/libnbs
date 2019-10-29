@@ -48,22 +48,22 @@ class NBSFile
     const INSTRUMENT_PLING = 16;//15 = Pling (Glowstone)
 
     public const MAPPING = [
-        NBSFile::INSTRUMENT_PIANO=>"note.harp",
-        NBSFile::INSTRUMENT_DOUBLE_BASS=>"note.bass",
-        NBSFile::INSTRUMENT_BASS_DRUM=>"note.basedrum",//TODO confirm. And where did bassattack go?
-        NBSFile::INSTRUMENT_SNARE=>"note.snare",
-        NBSFile::INSTRUMENT_CLICK=>"note.hat",
-        NBSFile::INSTRUMENT_GUITAR=>"note.guitar",
-        NBSFile::INSTRUMENT_FLUTE=>"note.flute",
-        NBSFile::INSTRUMENT_BELL=>"note.bell",
-        NBSFile::INSTRUMENT_CHIME=>"note.icechime",
-        NBSFile::INSTRUMENT_XYLOPHONE=>"note.xylobone",
-        NBSFile::INSTRUMENT_IRONXYLOPHONE=>"note.iron_xylophone",
-        NBSFile::INSTRUMENT_COWBELL=>"note.cow_bell",
-        NBSFile::INSTRUMENT_DIDGERIDOO=>"note.didgeridoo",
-        NBSFile::INSTRUMENT_BIT=>"note.bit",
-        NBSFile::INSTRUMENT_BANJO=>"note.banjo",
-        NBSFile::INSTRUMENT_PLING=>"note.pling",
+        NBSFile::INSTRUMENT_PIANO => "note.harp",
+        NBSFile::INSTRUMENT_DOUBLE_BASS => "note.bass",
+        NBSFile::INSTRUMENT_BASS_DRUM => "note.basedrum",//TODO confirm. And where did bassattack go?
+        NBSFile::INSTRUMENT_SNARE => "note.snare",
+        NBSFile::INSTRUMENT_CLICK => "note.hat",
+        NBSFile::INSTRUMENT_GUITAR => "note.guitar",
+        NBSFile::INSTRUMENT_FLUTE => "note.flute",
+        NBSFile::INSTRUMENT_BELL => "note.bell",
+        NBSFile::INSTRUMENT_CHIME => "note.icechime",
+        NBSFile::INSTRUMENT_XYLOPHONE => "note.xylobone",
+        NBSFile::INSTRUMENT_IRONXYLOPHONE => "note.iron_xylophone",
+        NBSFile::INSTRUMENT_COWBELL => "note.cow_bell",
+        NBSFile::INSTRUMENT_DIDGERIDOO => "note.didgeridoo",
+        NBSFile::INSTRUMENT_BIT => "note.bit",
+        NBSFile::INSTRUMENT_BANJO => "note.banjo",
+        NBSFile::INSTRUMENT_PLING => "note.pling",
     ];
 
     public $buffer;
@@ -91,6 +91,15 @@ class NBSFile
     public $notes = [];
     /** @var Layer[] */
     public $layerInfo = [];
+    /** @var CustomInstrument[] */
+    public $customInstruments = [];
+    /**
+     * If the file is created via OpenNoteBlockStudio https://github.com/HielkeMinecraft/OpenNoteBlockStudio/
+     * @var bool
+     */
+    private $isOpenNBS = false;
+    private $openNBSVersion = 0;
+    private $vanillaInstrumentsCount = 0;
 
     public function __construct(string $path)
     {
@@ -99,6 +108,14 @@ class NBSFile
         fclose($fopen);
         ### HEADER ###
         $this->length = $this->getShort();
+        if ($this->length === 0) {
+            $this->isOpenNBS = true;
+        }
+        if ($this->isOpenNBS) {
+            $this->openNBSVersion = $this->getByte();
+            $this->vanillaInstrumentsCount = $this->getByte();
+            $this->length = $this->getShort();
+        }
         $this->layers = $this->getShort();
         $this->name = $this->getString();
         $this->author = $this->getString();
@@ -153,26 +170,40 @@ class NBSFile
 
         $this->notes = $notes;
 
-        Server::getInstance()->getLogger()->debug("Found " . count($notes) . " notes!");
-        Server::getInstance()->getLogger()->debug("Piano: " . ($instrumentcount[self::INSTRUMENT_PIANO] ?? 0));
-        Server::getInstance()->getLogger()->debug("Double Bass: " . ($instrumentcount[self::INSTRUMENT_DOUBLE_BASS] ?? 0));
-        Server::getInstance()->getLogger()->debug("Bass Drum: " . ($instrumentcount[self::INSTRUMENT_BASS_DRUM] ?? 0));
-        Server::getInstance()->getLogger()->debug("Snare Drum: " . ($instrumentcount[self::INSTRUMENT_SNARE] ?? 0));
-        Server::getInstance()->getLogger()->debug("Click: " . ($instrumentcount[self::INSTRUMENT_CLICK] ?? 0));
-        Server::getInstance()->getLogger()->debug("Guitar: " . ($instrumentcount[self::INSTRUMENT_GUITAR] ?? 0));
-        Server::getInstance()->getLogger()->debug("Flute: " . ($instrumentcount[self::INSTRUMENT_FLUTE] ?? 0));
-        Server::getInstance()->getLogger()->debug("Bell: " . ($instrumentcount[self::INSTRUMENT_BELL] ?? 0));
-        Server::getInstance()->getLogger()->debug("Chime: " . ($instrumentcount[self::INSTRUMENT_CHIME] ?? 0));
-        Server::getInstance()->getLogger()->debug("Xylophone: " . ($instrumentcount[self::INSTRUMENT_XYLOPHONE] ?? 0));
+        Server::getInstance()->getLogger()->debug("Found " . count($notes) . " notes");
 
         ### LAYER INFO ###
         for ($i = 0; $i < $this->layers; $i++) {
-            $layer = new Layer($i + 1, $this->getString(), $this->getByte(), $layercount[$i] ?? 0);
+            $stereo = 100;
+            $name = $this->getString();
+            $volume = $this->getByte();
+            if ($this->isOpenNBS) $stereo = $this->getByte();
+            $layer = new Layer($i + 1, $name, $volume, $layercount[$i] ?? 0, $stereo);
             $this->layerInfo[] = $layer;
-            Server::getInstance()->getLogger()->debug("Layer " . $layer->id . ", Name: " . $layer->name . ", Volume: " . $layer->volume . "%, Note blocks: " . $layer->notes);
+
+            //Stereoinfo string
+            $stereoPercentage = abs($stereo - 100) / 100;
+            $stereoString = "Center";
+            if ($stereo > 100) {
+                $stereoString = "Right";
+            }
+            if ($stereo < 100) {
+                $stereoString = "Left";
+            }
+            Server::getInstance()->getLogger()->debug("Layer " . $layer->id . ", Name: " . $layer->name . ", Volume: " . $layer->volume . "%, Note blocks: " . $layer->notes . ", Stereo: " . $stereoString . " ($stereoPercentage%)");
         }
 
-        ### CUSTOM INSTRUMENTS - UNUSED ###
+        if ($this->get(1) > 0) {
+            for ($i = 0; $i < $this->getByte(); $i++) {
+                $name = $this->getString();
+                $soundFile = $this->getString();
+                $pitch = $this->getByte();
+                $pressKey = $this->getByte() === 1;
+                $layer = new CustomInstrument($name, $soundFile, $pitch, $pressKey);
+                $this->customInstruments[] = $layer;
+                Server::getInstance()->getLogger()->debug("Custom instrument " . $i . ": Name: $name, Sound file: $soundFile, Pitch: $pitch, Press Key: " . ($pressKey ? "Yes" : "No"));
+            }
+        }
     }
 
     /**
@@ -204,7 +235,7 @@ class NBSFile
         return $this->layerInfo;
     }
 
-    public function get($len)
+    private function get($len)
     {
         if ($len < 0) {
             $this->offset = strlen($this->buffer) - 1;
@@ -216,22 +247,22 @@ class NBSFile
         return $len === 1 ? $this->buffer{$this->offset++} : substr($this->buffer, ($this->offset += $len) - $len, $len);
     }
 
-    public function getString(bool $network = false)
+    private function getString(bool $network = false)
     {
         return $this->get(unpack("I", $this->get(4))[1]);
     }
 
-    public function getShort(): int
+    private function getShort(): int
     {
         return Binary::readLShort($this->get(2));
     }
 
-    public function getByte(): int
+    private function getByte(): int
     {
         return Binary::readByte($this->get(1));
     }
 
-    public function getInt(bool $network = false): int
+    private function getInt(bool $network = false): int
     {
         if ($network === true) {
             return Binary::readVarInt($this->buffer, $this->offset);
