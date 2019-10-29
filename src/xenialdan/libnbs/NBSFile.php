@@ -21,183 +21,221 @@
 
 namespace xenialdan\libnbs;
 
-
 use pocketmine\Server;
 use pocketmine\utils\Binary;
 
-class NBSFile{
-	const INSTRUMENT_PIANO = 0;
-	const INSTRUMENT_DOUBLE_BASS = 1;
-	const INSTRUMENT_BASS_DRUM = 2;
-	const INSTRUMENT_SNARE = 3;
-	const INSTRUMENT_CLICK = 4;
-	const INSTRUMENT_GUITAR = 5;
-	const INSTRUMENT_FLUTE = 6;
-	const INSTRUMENT_BELL = 7;
-	const INSTRUMENT_CHIME = 8;
-	const INSTRUMENT_XYLOPHONE = 9;
+class NBSFile
+{
+    const INSTRUMENT_PIANO = 0;//0 = Piano (air)
+    const INSTRUMENT_DOUBLE_BASS = 1;//1 = Double Bass (wood)
+    const INSTRUMENT_BASS_DRUM = 2;//2 = Bass Drum (stone)
+    const INSTRUMENT_SNARE = 3;//3 = Snare Drum (sand)
+    const INSTRUMENT_CLICK = 4;//4 = Click (glass)
+    const INSTRUMENT_GUITAR = 5;//5 = Guitar (wool)
+    const INSTRUMENT_FLUTE = 6;//6 = Flute (Clay)
+    const INSTRUMENT_BELL = 7;//7 = Bell (Block of Gold)
+    const INSTRUMENT_CHIME = 8;//8 = Chime (Packed Ice)
+    const INSTRUMENT_XYLOPHONE = 9;//9 = Xylophone (Bone Block)
+    /**
+     * OpenNoteBlockStudio
+     * @see https://hielkeminecraft.github.io/OpenNoteBlockStudio/nbs
+     */
+    const INSTRUMENT_IRONXYLOPHONE = 10;//10 = Iron Xylophone (Iron Block)
+    const INSTRUMENT_COWBELL = 11;//11 = Cow Bell (Soul Sand)
+    const INSTRUMENT_DIDGERIDOO = 12;//12 = Didgeridoo (Pumpkin)
+    const INSTRUMENT_BIT = 13;//13 = Bit (Block of Emerald)
+    const INSTRUMENT_BANJO = 14;//14 = Banjo (Hay)
+    const INSTRUMENT_PLING = 16;//15 = Pling (Glowstone)
 
-	public $buffer;
-	public $offset;
-	private $data;
+    public const MAPPING = [
+        NBSFile::INSTRUMENT_PIANO=>"note.harp",
+        NBSFile::INSTRUMENT_DOUBLE_BASS=>"note.bass",
+        NBSFile::INSTRUMENT_BASS_DRUM=>"note.basedrum",//TODO confirm. And where did bassattack go?
+        NBSFile::INSTRUMENT_SNARE=>"note.snare",
+        NBSFile::INSTRUMENT_CLICK=>"note.hat",
+        NBSFile::INSTRUMENT_GUITAR=>"note.guitar",
+        NBSFile::INSTRUMENT_FLUTE=>"note.flute",
+        NBSFile::INSTRUMENT_BELL=>"note.bell",
+        NBSFile::INSTRUMENT_CHIME=>"note.icechime",
+        NBSFile::INSTRUMENT_XYLOPHONE=>"note.xylobone",
+        NBSFile::INSTRUMENT_IRONXYLOPHONE=>"note.iron_xylophone",
+        NBSFile::INSTRUMENT_COWBELL=>"note.cow_bell",
+        NBSFile::INSTRUMENT_DIDGERIDOO=>"note.didgeridoo",
+        NBSFile::INSTRUMENT_BIT=>"note.bit",
+        NBSFile::INSTRUMENT_BANJO=>"note.banjo",
+        NBSFile::INSTRUMENT_PLING=>"note.pling",
+    ];
 
-	public $length = 0;
-	public $layers = 0;
-	public $name = "";
-	public $author = "";
-	public $originalAuthor = "";
-	public $songDescription = "";
-	public $tempo = 0; // $tempo / 100 = tps
-	public $autoSaving = 0;
-	public $autoSavingDuration = 60;
-	public $timeSignature = 4;
-	public $minutesSpent = 0;
-	public $leftClicks = 0;
-	public $rightClicks = 0;
-	public $blocksAdded = 0;
-	public $blocksRemoved = 0;
-	public $importedFileName = "";
+    public $buffer;
+    public $offset;
+    private $data;
 
-	/** @var Note[] */
-	public $notes = [];
-	/** @var Layer[] */
-	public $layerInfo = [];
+    public $length = 0;
+    public $layers = 0;
+    public $name = "";
+    public $author = "";
+    public $originalAuthor = "";
+    public $songDescription = "";
+    public $tempo = 0; // $tempo / 100 = tps
+    public $autoSaving = 0;
+    public $autoSavingDuration = 60;
+    public $timeSignature = 4;
+    public $minutesSpent = 0;
+    public $leftClicks = 0;
+    public $rightClicks = 0;
+    public $blocksAdded = 0;
+    public $blocksRemoved = 0;
+    public $importedFileName = "";
 
-	public function __construct(string $path){
-		$fopen = fopen($path, "r");
-		$this->buffer = fread($fopen, filesize($path));
-		fclose($fopen);
-		### HEADER ###
-		$this->length = $this->getShort();
-		$this->layers = $this->getShort();
-		$this->name = $this->getString();
-		$this->author = $this->getString();
-		$this->originalAuthor = $this->getString();
-		$this->songDescription = $this->getString();
-		$this->tempo = $this->getShort();
-		$this->autoSaving = $this->getByte();
-		$this->autoSavingDuration = $this->getByte();
-		$this->timeSignature = $this->getByte();
-		$this->minutesSpent = $this->getInt();
-		$this->leftClicks = $this->getInt();
-		$this->rightClicks = $this->getInt();
-		$this->blocksAdded = $this->getInt();
-		$this->blocksRemoved = $this->getInt();
-		$this->importedFileName = $this->getString();
-		### DATA ###
-		/** @var Note[] $noteblocks */
-		$notes = [];
-		/** @var int[] $instrumentcount */
-		$instrumentcount = [];
-		/** @var int[] $layercount */
-		$layercount = [];
+    /** @var Note[] */
+    public $notes = [];
+    /** @var Layer[] */
+    public $layerInfo = [];
 
-		$tick = -1;
-		$jumps = 0;
-		while (true){
-			$jumps = $this->getShort();
-			if ($jumps === 0) break;
-			$tick += $jumps;
-			$layer = -1;
-			while (true){
-				$jumps = $this->getShort();
-				if ($jumps === 0) break;
-				$layer += $jumps;
-				$instrument = $this->getByte();
-				$key = $this->getByte();
-				$notes[] = new Note($tick, $layer, $instrument, $key);
-				if (isset($instrumentcount[$instrument])){
-					$instrumentcount[$instrument]++;
-				} else{
-					$instrumentcount[$instrument] = 1;
-				}
-				if ($layer < $this->layers){
-					if (isset($layercount[$layer])){
-						$layercount[$layer]++;
-					} else{
-						$layercount[$layer] = 1;
-					}
-				};
-			}
-		}
+    public function __construct(string $path)
+    {
+        $fopen = fopen($path, "r");
+        $this->buffer = fread($fopen, filesize($path));
+        fclose($fopen);
+        ### HEADER ###
+        $this->length = $this->getShort();
+        $this->layers = $this->getShort();
+        $this->name = $this->getString();
+        $this->author = $this->getString();
+        $this->originalAuthor = $this->getString();
+        $this->songDescription = $this->getString();
+        $this->tempo = $this->getShort();
+        $this->autoSaving = $this->getByte();
+        $this->autoSavingDuration = $this->getByte();
+        $this->timeSignature = $this->getByte();
+        $this->minutesSpent = $this->getInt();
+        $this->leftClicks = $this->getInt();
+        $this->rightClicks = $this->getInt();
+        $this->blocksAdded = $this->getInt();
+        $this->blocksRemoved = $this->getInt();
+        $this->importedFileName = $this->getString();
+        ### DATA ###
+        /** @var Note[] $noteblocks */
+        $notes = [];
+        /** @var int[] $instrumentcount */
+        $instrumentcount = [];
+        /** @var int[] $layercount */
+        $layercount = [];
 
-		$this->notes = $notes;
+        $tick = -1;
+        $jumps = 0;
+        while (true) {
+            $jumps = $this->getShort();
+            if ($jumps === 0) break;
+            $tick += $jumps;
+            $layer = -1;
+            while (true) {
+                $jumps = $this->getShort();
+                if ($jumps === 0) break;
+                $layer += $jumps;
+                $instrument = $this->getByte();
+                $key = $this->getByte();
+                $notes[] = new Note($tick, $layer, $instrument, $key);
+                if (isset($instrumentcount[$instrument])) {
+                    $instrumentcount[$instrument]++;
+                } else {
+                    $instrumentcount[$instrument] = 1;
+                }
+                if ($layer < $this->layers) {
+                    if (isset($layercount[$layer])) {
+                        $layercount[$layer]++;
+                    } else {
+                        $layercount[$layer] = 1;
+                    }
+                };
+            }
+        }
 
-		Server::getInstance()->getLogger()->debug("Found " . count($notes) . " notes!");
-		Server::getInstance()->getLogger()->debug("Piano: " . ($instrumentcount[self::INSTRUMENT_PIANO] ?? 0));
-		Server::getInstance()->getLogger()->debug("Double Bass: " . ($instrumentcount[self::INSTRUMENT_DOUBLE_BASS] ?? 0));
-		Server::getInstance()->getLogger()->debug("Bass Drum: " . ($instrumentcount[self::INSTRUMENT_BASS_DRUM] ?? 0));
-		Server::getInstance()->getLogger()->debug("Snare Drum: " . ($instrumentcount[self::INSTRUMENT_SNARE] ?? 0));
-		Server::getInstance()->getLogger()->debug("Click: " . ($instrumentcount[self::INSTRUMENT_CLICK] ?? 0));
-		Server::getInstance()->getLogger()->debug("Guitar: " . ($instrumentcount[self::INSTRUMENT_GUITAR] ?? 0));
-		Server::getInstance()->getLogger()->debug("Flute: " . ($instrumentcount[self::INSTRUMENT_FLUTE] ?? 0));
-		Server::getInstance()->getLogger()->debug("Bell: " . ($instrumentcount[self::INSTRUMENT_BELL] ?? 0));
-		Server::getInstance()->getLogger()->debug("Chime: " . ($instrumentcount[self::INSTRUMENT_CHIME] ?? 0));
-		Server::getInstance()->getLogger()->debug("Xylophone: " . ($instrumentcount[self::INSTRUMENT_XYLOPHONE] ?? 0));
+        $this->notes = $notes;
 
-		### LAYER INFO ###
-		for ($i = 0; $i < $this->layers; $i++){
-			$layer = new Layer($i + 1, $this->getString(), $this->getByte(), $layercount[$i] ?? 0);
-			$this->layerInfo[] = $layer;
-			Server::getInstance()->getLogger()->debug("Layer " . $layer->id . ", Name: " . $layer->name . ", Volume: " . $layer->volume . "%, Note blocks: " . $layer->notes);
-		}
+        Server::getInstance()->getLogger()->debug("Found " . count($notes) . " notes!");
+        Server::getInstance()->getLogger()->debug("Piano: " . ($instrumentcount[self::INSTRUMENT_PIANO] ?? 0));
+        Server::getInstance()->getLogger()->debug("Double Bass: " . ($instrumentcount[self::INSTRUMENT_DOUBLE_BASS] ?? 0));
+        Server::getInstance()->getLogger()->debug("Bass Drum: " . ($instrumentcount[self::INSTRUMENT_BASS_DRUM] ?? 0));
+        Server::getInstance()->getLogger()->debug("Snare Drum: " . ($instrumentcount[self::INSTRUMENT_SNARE] ?? 0));
+        Server::getInstance()->getLogger()->debug("Click: " . ($instrumentcount[self::INSTRUMENT_CLICK] ?? 0));
+        Server::getInstance()->getLogger()->debug("Guitar: " . ($instrumentcount[self::INSTRUMENT_GUITAR] ?? 0));
+        Server::getInstance()->getLogger()->debug("Flute: " . ($instrumentcount[self::INSTRUMENT_FLUTE] ?? 0));
+        Server::getInstance()->getLogger()->debug("Bell: " . ($instrumentcount[self::INSTRUMENT_BELL] ?? 0));
+        Server::getInstance()->getLogger()->debug("Chime: " . ($instrumentcount[self::INSTRUMENT_CHIME] ?? 0));
+        Server::getInstance()->getLogger()->debug("Xylophone: " . ($instrumentcount[self::INSTRUMENT_XYLOPHONE] ?? 0));
 
-		### CUSTOM INSTRUMENTS - UNUSED ###
-	}
+        ### LAYER INFO ###
+        for ($i = 0; $i < $this->layers; $i++) {
+            $layer = new Layer($i + 1, $this->getString(), $this->getByte(), $layercount[$i] ?? 0);
+            $this->layerInfo[] = $layer;
+            Server::getInstance()->getLogger()->debug("Layer " . $layer->id . ", Name: " . $layer->name . ", Volume: " . $layer->volume . "%, Note blocks: " . $layer->notes);
+        }
 
-	/**
-	 * @return Note[]
-	 */
-	public function getNotes(){
-		return $this->notes;
-	}
+        ### CUSTOM INSTRUMENTS - UNUSED ###
+    }
 
-	/**
-	 * @param int $tick
-	 * @return Note[]
-	 */
-	public function getNotesAtTick(int $tick){
-		$notes = [];
-		foreach ($this->notes as $note){
-			if ($note->tick === $tick) $notes[] = $note;
-		}
-		return $notes;
-	}
+    /**
+     * @return Note[]
+     */
+    public function getNotes()
+    {
+        return $this->notes;
+    }
 
-	/**
-	 * @return Layer[]
-	 */
-	public function getLayerInfo(): array{
-		return $this->layerInfo;
-	}
+    /**
+     * @param int $tick
+     * @return Note[]
+     */
+    public function getNotesAtTick(int $tick)
+    {
+        $notes = [];
+        foreach ($this->notes as $note) {
+            if ($note->tick === $tick) $notes[] = $note;
+        }
+        return $notes;
+    }
 
-	public function get($len){
-		if($len < 0){
-			$this->offset = strlen($this->buffer) - 1;
-			return "";
-		}elseif($len === true){
-			return substr($this->buffer, $this->offset);
-		}
+    /**
+     * @return Layer[]
+     */
+    public function getLayerInfo(): array
+    {
+        return $this->layerInfo;
+    }
 
-		return $len === 1 ? $this->buffer{$this->offset++} : substr($this->buffer, ($this->offset += $len) - $len, $len);
-	}
+    public function get($len)
+    {
+        if ($len < 0) {
+            $this->offset = strlen($this->buffer) - 1;
+            return "";
+        } else if ($len === true) {
+            return substr($this->buffer, $this->offset);
+        }
 
-	public function getString(bool $network = false){
-		return $this->get(unpack("I", $this->get(4))[1]);
-	}
+        return $len === 1 ? $this->buffer{$this->offset++} : substr($this->buffer, ($this->offset += $len) - $len, $len);
+    }
 
-	public function getShort() : int{
+    public function getString(bool $network = false)
+    {
+        return $this->get(unpack("I", $this->get(4))[1]);
+    }
+
+    public function getShort(): int
+    {
         return Binary::readLShort($this->get(2));
-	}
+    }
 
-	public function getByte() : int{
-		return Binary::readByte($this->get(1));
-	}
+    public function getByte(): int
+    {
+        return Binary::readByte($this->get(1));
+    }
 
-	public function getInt(bool $network = false) : int{
-		if($network === true){
-			return Binary::readVarInt($this->buffer, $this->offset);
-		}
+    public function getInt(bool $network = false): int
+    {
+        if ($network === true) {
+            return Binary::readVarInt($this->buffer, $this->offset);
+        }
         return Binary::readLInt($this->get(4));
-	}
+    }
 }
