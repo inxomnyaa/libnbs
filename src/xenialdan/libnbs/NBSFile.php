@@ -1,28 +1,19 @@
 <?php
-
 /*
- *
- *  ____            _        _   __  __ _                  __  __ ____
- * |  _ \ ___   ___| | _____| |_|  \/  (_)_ __   ___      |  \/  |  _ \
- * | |_) / _ \ / __| |/ / _ \ __| |\/| | | '_ \ / _ \_____| |\/| | |_) |
- * |  __/ (_) | (__|   <  __/ |_| |  | | | | | |  __/_____| |  | |  __/
- * |_|   \___/ \___|_|\_\___|\__|_|  |_|_|_| |_|\___|     |_|  |_|_|
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * @author PocketMine Team
- * @link http://www.pocketmine.net/
- *
- *
-*/
+ * References:
+ * https://github.com/HielkeMinecraft/OpenNoteBlockStudio/
+ * https://github.com/koca2000/NoteBlockAPI/
+ * https://www.stuffbydavid.com/mcnbs/format
+ * https://minecraft.gamepedia.com/Noteblock
+ * https://www.minecraftforum.net/forums/mapping-and-modding-java-edition/resource-packs/resource-pack-discussion/1255570-making-music-with-playsound
+ */
 
 namespace xenialdan\libnbs;
 
-use pocketmine\Server;
-use pocketmine\utils\Binary;
+use Ds\Map;
+use pocketmine\utils\BinaryDataException;
+use pocketmine\utils\Utils;
+use SplFileObject;
 
 class NBSFile
 {
@@ -37,8 +28,8 @@ class NBSFile
     const INSTRUMENT_CHIME = 8;//8 = Chime (Packed Ice)
     const INSTRUMENT_XYLOPHONE = 9;//9 = Xylophone (Bone Block)
     /**
-     * OpenNoteBlockStudio
-     * @see https://hielkeminecraft.github.io/OpenNoteBlockStudio/nbs
+     * New instruments added by OpenNoteBlockStudio
+     * https://hielkeminecraft.github.io/OpenNoteBlockStudio/nbs
      */
     const INSTRUMENT_IRONXYLOPHONE = 10;//10 = Iron Xylophone (Iron Block)
     const INSTRUMENT_COWBELL = 11;//11 = Cow Bell (Soul Sand)
@@ -50,7 +41,8 @@ class NBSFile
     public const MAPPING = [
         NBSFile::INSTRUMENT_PIANO => "note.harp",
         NBSFile::INSTRUMENT_DOUBLE_BASS => "note.bass",
-        NBSFile::INSTRUMENT_BASS_DRUM => "note.basedrum",//TODO confirm. And where did bassattack go?
+        //NBSFile::INSTRUMENT_BASS_DRUM => "note.basedrum",//TODO confirm. And where did bassattack go?
+        NBSFile::INSTRUMENT_BASS_DRUM => "note.bd",//still note.bd in 1.12. TODO change when 1.13 pocketmine releases
         NBSFile::INSTRUMENT_SNARE => "note.snare",
         NBSFile::INSTRUMENT_CLICK => "note.hat",
         NBSFile::INSTRUMENT_GUITAR => "note.guitar",
@@ -66,207 +58,159 @@ class NBSFile
         NBSFile::INSTRUMENT_PLING => "note.pling",
     ];
 
-    public $buffer;
-    public $offset;
-    private $data;
-
-    public $length = 0;
-    public $layers = 0;
-    public $name = "";
-    public $author = "";
-    public $originalAuthor = "";
-    public $songDescription = "";
-    public $tempo = 0; // $tempo / 100 = tps
-    public $autoSaving = 0;
-    public $autoSavingDuration = 60;
-    public $timeSignature = 4;
-    public $minutesSpent = 0;
-    public $leftClicks = 0;
-    public $rightClicks = 0;
-    public $blocksAdded = 0;
-    public $blocksRemoved = 0;
-    public $importedFileName = "";
-
-    /** @var Note[] */
-    public $notes = [];
-    /** @var Layer[] */
-    public $layerInfo = [];
-    /** @var CustomInstrument[] */
-    public $customInstruments = [];
     /**
-     * If the file is created via OpenNoteBlockStudio https://github.com/HielkeMinecraft/OpenNoteBlockStudio/
-     * @var bool
+     * Parses a Song from an InputStream and a Note Block Studio project file (.nbs)
+     * @param string $path path to the .nbs file
+     * @return Song object representing the given .nbs file
+     * @throws \RuntimeException
+     * @see Song
      */
-    private $isOpenNBS = false;
-    private $openNBSVersion = 0;
-    private $vanillaInstrumentsCount = 0;
-
-    public function __construct(string $path)
+    public static function parse(string $path): ?Song
     {
-        $fopen = fopen($path, "r");
-        $this->buffer = fread($fopen, filesize($path));
-        fclose($fopen);
-        ### HEADER ###
-        $this->length = $this->getShort();
-        if ($this->length === 0) {
-            $this->isOpenNBS = true;
-        }
-        if ($this->isOpenNBS) {
-            $this->openNBSVersion = $this->getByte();
-            $this->vanillaInstrumentsCount = $this->getByte();
-            $this->length = $this->getShort();
-        }
-        $this->layers = $this->getShort();
-        $this->name = $this->getString();
-        $this->author = $this->getString();
-        $this->originalAuthor = $this->getString();
-        $this->songDescription = $this->getString();
-        $this->tempo = $this->getShort();
-        $this->autoSaving = $this->getByte();
-        $this->autoSavingDuration = $this->getByte();
-        $this->timeSignature = $this->getByte();
-        $this->minutesSpent = $this->getInt();
-        $this->leftClicks = $this->getInt();
-        $this->rightClicks = $this->getInt();
-        $this->blocksAdded = $this->getInt();
-        $this->blocksRemoved = $this->getInt();
-        $this->importedFileName = $this->getString();
-        ### DATA ###
-        /** @var Note[] $noteblocks */
-        $notes = [];
-        /** @var int[] $instrumentcount */
-        $instrumentcount = [];
-        /** @var int[] $layercount */
-        $layercount = [];
+        // int => Layer
+        $layerHashMap = new Map();
 
+        ### HEADER ###
+        try {
+            $path = Utils::cleanPath(realpath($path));
+            $file = new SplFileObject($path);
+            $file->rewind();
+            //TODO test
+            $fread = $file->fread($file->getSize());
+            if ($fread === false) throw new \StringOutOfBoundsException("Could not read file $path");
+            $binaryStream = new NBSBinaryStream($fread);
+
+            $file = null;
+            unset($file);
+            //
+            $length = $binaryStream->getLShort();
+            $firstCustomInstrument = 10;
+            $nbsVersion = 0;
+            if ($length === 0) {
+                $nbsVersion = $binaryStream->getByte();
+                $firstCustomInstrument = $binaryStream->getByte();
+                if ($nbsVersion >= 3)
+                    $length = $binaryStream->getLShort();
+        }
+            $songHeight = $binaryStream->getLShort();
+            $title = $binaryStream->getString();
+            $author = $binaryStream->getString();
+            /*$originalAuthor = */
+            $binaryStream->getString();
+            $description = $binaryStream->getString();
+            $speed = $binaryStream->getLShort() / 100;
+            /*$autoSaving = */
+            $binaryStream->getByte();
+            /*$autoSavingDuration = */
+            $binaryStream->getByte();
+            /*$timeSignature = */
+            $binaryStream->getByte();
+            /*$minutesSpent = */
+            $binaryStream->getInt();
+            /*$leftClicks = */
+            $binaryStream->getInt();
+            /*$rightClicks = */
+            $binaryStream->getInt();
+            /*$blocksAdded = */
+            $binaryStream->getInt();
+            /*$blocksRemoved = */
+            $binaryStream->getInt();
+            /*$importedFileName = */
+            $binaryStream->getString();
+
+        ### DATA ###
         $tick = -1;
-        $jumps = 0;
         while (true) {
-            $jumps = $this->getShort();
-            if ($jumps === 0) break;
-            $tick += $jumps;
+            $jumpTicks = $binaryStream->getLShort();
+            if ($jumpTicks === 0) break;
+            $tick += $jumpTicks;
             $layer = -1;
             while (true) {
-                $jumps = $this->getShort();
-                if ($jumps === 0) break;
-                $layer += $jumps;
-                $instrument = $this->getByte();
-                $key = $this->getByte();
-                $notes[] = new Note($tick, $layer, $instrument, $key);
-                if (isset($instrumentcount[$instrument])) {
-                    $instrumentcount[$instrument]++;
-                } else {
-                    $instrumentcount[$instrument] = 1;
-                }
-                if ($layer < $this->layers) {
-                    if (isset($layercount[$layer])) {
-                        $layercount[$layer]++;
-                    } else {
-                        $layercount[$layer] = 1;
-                    }
-                };
+                $jumpLayers = $binaryStream->getLShort();
+                if ($jumpLayers === 0) break;
+                $layer += $jumpLayers;
+                $instrument = $binaryStream->getByte();
+                $key = $binaryStream->getByte();
+                //TODO custom instrument
+                self::setNote($layer, $tick, $instrument, $key, $layerHashMap);
             }
         }
-
-        $this->notes = $notes;
-
-        Server::getInstance()->getLogger()->debug("Found " . count($notes) . " notes");
+            if ($nbsVersion > 0 && $nbsVersion < 3) {
+                $length = $tick;
+            }
 
         ### LAYER INFO ###
-        for ($i = 0; $i < $this->layers; $i++) {
+            for ($i = 0; $i < $songHeight; $i++) {
+                /** @var Layer $layer */
+                $layer = $layerHashMap->get($i, null);
+
+                $name = $binaryStream->getString();
+                $volume = $binaryStream->getByte();
             $stereo = 100;
-            $name = $this->getString();
-            $volume = $this->getByte();
-            if ($this->isOpenNBS) $stereo = $this->getByte();
-            $layer = new Layer($i + 1, $name, $volume, $layercount[$i] ?? 0, $stereo);
-            $this->layerInfo[] = $layer;
 
-            //Stereoinfo string
-            $stereoPercentage = abs($stereo - 100) / 100;
-            $stereoString = "Center";
-            if ($stereo > 100) {
-                $stereoString = "Right";
+                if ($nbsVersion >= 2) {
+                    $stereo = $binaryStream->getByte();
             }
-            if ($stereo < 100) {
-                $stereoString = "Left";
+                if ($layer !== null) {
+                    $layer->setName($name);
+                    $layer->setVolume($volume);
+                    $layer->setStereo($stereo);
             }
-            Server::getInstance()->getLogger()->debug("Layer " . $layer->id . ", Name: " . $layer->name . ", Volume: " . $layer->volume . "%, Note blocks: " . $layer->notes . ", Stereo: " . $stereoString . " ($stereoPercentage%)");
         }
 
-        if ($this->get(1) > 0) {
-            for ($i = 0; $i < $this->getByte(); $i++) {
-                $name = $this->getString();
-                $soundFile = $this->getString();
-                $pitch = $this->getByte();
-                $pressKey = $this->getByte() === 1;
-                $layer = new CustomInstrument($name, $soundFile, $pitch, $pressKey);
-                $this->customInstruments[] = $layer;
-                Server::getInstance()->getLogger()->debug("Custom instrument " . $i . ": Name: $name, Sound file: $soundFile, Pitch: $pitch, Press Key: " . ($pressKey ? "Yes" : "No"));
-            }
+            $countCustom = $binaryStream->getByte();
+            $customInstrumentsArray = [];
+            for ($index = 0; $index < $countCustom; $index++) {
+                $name = $binaryStream->getString();
+                $soundFile = $binaryStream->getString();
+                $pitch = $binaryStream->getByte();
+                $pressKey = $binaryStream->getByte() === 1;
+                $customInstrumentsArray[$index] = new CustomInstrument($index, $name, $soundFile, $pitch, $pressKey);
         }
+            /*TODO customdiff
+            if (firstcustominstrumentdiff < 0){
+                ArrayList<CustomInstrument> customInstruments = CompatibilityUtils.getVersionCustomInstrumentsForSong(firstcustominstrument);
+                customInstruments.addAll(Arrays.asList(customInstrumentsArray));
+                customInstrumentsArray = customInstruments.toArray(customInstrumentsArray);
+            } else {
+                firstcustominstrument += firstcustominstrumentdiff;
+            }
+            */
+            return new Song($speed, $layerHashMap, $songHeight, $length, $title, $author, $description, $path, $firstCustomInstrument, $customInstrumentsArray);
+            /*} catch (\LogicException $e) {
+                Server::getInstance()->getLogger()->logException($e);
+            } catch (\RuntimeException $e) {
+                Server::getInstance()->getLogger()->logException($e);
+            */
+        } catch (BinaryDataException $e) {
+            $fileName = $path;
+            if (isset($file) && $file != null) {
+                $fileName = $file->getFilename();
+            }
+            #Server::getInstance()->getLogger()->error("Song is corrupted: " . $fileName);
+            print "Song $fileName is corrupted";
+            print $e;
+        } catch (\Exception $e) {
+            print $e;
+        }
+        return null;
     }
 
     /**
-     * @return Note[]
+     * Sets a note at a tick in a song
+     * @param int $layerIndex
+     * @param int $ticks
+     * @param int $instrument
+     * @param int $key
+     * @param Map $layerHashMap
      */
-    public function getNotes()
+    private static function setNote(int $layerIndex, int $ticks, int $instrument, int $key, Map &$layerHashMap): void
     {
-        return $this->notes;
-    }
-
-    /**
-     * @param int $tick
-     * @return Note[]
-     */
-    public function getNotesAtTick(int $tick)
-    {
-        $notes = [];
-        foreach ($this->notes as $note) {
-            if ($note->tick === $tick) $notes[] = $note;
-        }
-        return $notes;
-    }
-
-    /**
-     * @return Layer[]
-     */
-    public function getLayerInfo(): array
-    {
-        return $this->layerInfo;
-    }
-
-    private function get($len)
-    {
-        if ($len < 0) {
-            $this->offset = strlen($this->buffer) - 1;
-            return "";
-        } else if ($len === true) {
-            return substr($this->buffer, $this->offset);
-        }
-
-        return $len === 1 ? $this->buffer{$this->offset++} : substr($this->buffer, ($this->offset += $len) - $len, $len);
-    }
-
-    private function getString(bool $network = false)
-    {
-        return $this->get(unpack("I", $this->get(4))[1]);
-    }
-
-    private function getShort(): int
-    {
-        return Binary::readLShort($this->get(2));
-    }
-
-    private function getByte(): int
-    {
-        return Binary::readByte($this->get(1));
-    }
-
-    private function getInt(bool $network = false): int
-    {
-        if ($network === true) {
-            return Binary::readVarInt($this->buffer, $this->offset);
-        }
-        return Binary::readLInt($this->get(4));
+        $layer = $layerHashMap->get($layerIndex, new Layer("", 100));
+        #if ($layer === null) {
+        #    $layer = new Layer();
+        if (!$layerHashMap->hasKey($layerIndex)) $layerHashMap->put($layerIndex, $layer);
+        #}
+        $layer->setNote($ticks, new Note($instrument, $key));
     }
 }
