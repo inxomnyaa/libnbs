@@ -40,16 +40,15 @@ class NBSFile
 
     public const MAPPING = [
         NBSFile::INSTRUMENT_PIANO => "note.harp",
-        NBSFile::INSTRUMENT_DOUBLE_BASS => "note.bass",
-        //NBSFile::INSTRUMENT_BASS_DRUM => "note.basedrum",//TODO confirm. And where did bassattack go?
-        NBSFile::INSTRUMENT_BASS_DRUM => "note.bd",//still note.bd in 1.12. TODO change when 1.13 pocketmine releases
+        NBSFile::INSTRUMENT_DOUBLE_BASS => "note.bass",//same as bassattack
+        NBSFile::INSTRUMENT_BASS_DRUM => "note.bd",
         NBSFile::INSTRUMENT_SNARE => "note.snare",
         NBSFile::INSTRUMENT_CLICK => "note.hat",
         NBSFile::INSTRUMENT_GUITAR => "note.guitar",
         NBSFile::INSTRUMENT_FLUTE => "note.flute",
         NBSFile::INSTRUMENT_BELL => "note.bell",
-        NBSFile::INSTRUMENT_CHIME => "note.icechime",
-        NBSFile::INSTRUMENT_XYLOPHONE => "note.xylobone",
+        NBSFile::INSTRUMENT_CHIME => "note.chime",
+        NBSFile::INSTRUMENT_XYLOPHONE => "note.xylophone",
         NBSFile::INSTRUMENT_IRONXYLOPHONE => "note.iron_xylophone",
         NBSFile::INSTRUMENT_COWBELL => "note.cow_bell",
         NBSFile::INSTRUMENT_DIDGERIDOO => "note.didgeridoo",
