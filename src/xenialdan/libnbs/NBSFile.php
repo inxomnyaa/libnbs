@@ -116,6 +116,14 @@ class NBSFile
             $binaryStream->getInt();
             /*$importedFileName = */
             $binaryStream->getString();
+            if ($nbsVersion >= 4) {
+                /*$loopOnOff = */
+                $binaryStream->getByte();
+                /*$maxLoopCount = */
+                $binaryStream->getByte();
+                /*$loopStartTick = */
+                $binaryStream->getLShort();
+            }
 
         ### DATA ###
         $tick = -1;
@@ -132,6 +140,14 @@ class NBSFile
                 $key = $binaryStream->getByte();
                 //TODO custom instrument
                 self::setNote($layer, $tick, $instrument, $key, $layerHashMap);
+                if ($nbsVersion >= 4) {
+                    /*$velocity = */
+                    $binaryStream->getByte();
+                    /*$panning = */
+                    $binaryStream->getByte();
+                    /*$pitch = */
+                    $binaryStream->getSignedLShort();
+                }
             }
         }
             if ($nbsVersion > 0 && $nbsVersion < 3) {
@@ -144,6 +160,10 @@ class NBSFile
                 $layer = $layerHashMap->get($i, null);
 
                 $name = $binaryStream->getString();
+                if ($nbsVersion >= 4) {
+                    /*$layerLock = */
+                    $binaryStream->getByte();
+                }
                 $volume = $binaryStream->getByte();
             $stereo = 100;
 
