@@ -36,7 +36,7 @@ class NBSFile
     const INSTRUMENT_DIDGERIDOO = 12;//12 = Didgeridoo (Pumpkin)
     const INSTRUMENT_BIT = 13;//13 = Bit (Block of Emerald)
     const INSTRUMENT_BANJO = 14;//14 = Banjo (Hay)
-    const INSTRUMENT_PLING = 16;//15 = Pling (Glowstone)
+    const INSTRUMENT_PLING = 15;//15 = Pling (Glowstone)
 
     public const MAPPING = [
         NBSFile::INSTRUMENT_PIANO => "note.harp",
