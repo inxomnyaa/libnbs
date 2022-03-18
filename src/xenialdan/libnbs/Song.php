@@ -4,40 +4,38 @@ declare(strict_types=1);
 
 namespace xenialdan\libnbs;
 
-use Ds\Map;
-
 /**
  * Represents a Note Block Studio project
  */
 class Song
 {
-    /** @var Map */
-    private $layerHashMap;
+    /** @var array<int,Layer> */
+    private array $layers;
     /** @var int */
-    private $songHeight;
+    private int $songHeight;
     /** @var int */
-    private $length;
+    private int $length;
     /** @var string */
-    private $title;
+    private string $title;
     /** @var string */
-    private $path;
+    private string $path;
     /** @var string */
-    private $author;
+    private string $author;
     /** @var string */
-    private $description;
+    private string $description;
     /** @var float */
-    private $speed;
+    private float $speed;
     /** @var float */
-    private $delay;
+    private float $delay;
     /** @var CustomInstrument[] */
-    private $customInstruments = [];
+    private array $customInstruments = [];
     /** @var int */
-    private $firstCustomInstrumentIndex;
+    private int $firstCustomInstrumentIndex;
 
     /**
      * Song constructor.
      * @param float $speed
-     * @param Map $layerHashMap
+     * @param array $layers
      * @param int $songHeight
      * @param int $length
      * @param string $title
@@ -47,11 +45,11 @@ class Song
      * @param int $firstCustomInstrumentIndex
      * @param CustomInstrument[] $customInstruments
      */
-    public function __construct(float $speed, Map $layerHashMap, int $songHeight, int $length, string $title, string $author, string $description, string $path, int $firstCustomInstrumentIndex, array $customInstruments)
+    public function __construct(float $speed, array $layers, int $songHeight, int $length, string $title, string $author, string $description, string $path, int $firstCustomInstrumentIndex, array $customInstruments)
     {
         $this->speed = $speed;
         $this->delay = 20 / $speed;
-        $this->layerHashMap = $layerHashMap;
+        $this->layers = $layers;
         $this->songHeight = $songHeight;
         $this->length = $length;
         $this->title = $title;
@@ -64,11 +62,11 @@ class Song
 
     /**
      * Gets all Layers in this Song and their index
-     * @return Map of Layers and their index
+     * @return Array of Layers and their index
      */
-    public function getLayerHashMap(): Map
+    public function getLayerHashMap(): array
     {
-        return $this->layerHashMap;
+        return $this->layers;
     }
 
     /**
@@ -164,7 +162,7 @@ class Song
 
     public function __toString()
     {
-        return "Song {$this->getTitle()} (" . basename($this->path) . "), author {$this->getAuthor()}, description {$this->getDescription()}, length {$this->getLength()}, speed {$this->getSpeed()}, delay {$this->getDelay()}, height {$this->getSongHeight()}, count {$this->getLayerHashMap()->count()}";
+        return "Song {$this->getTitle()} (" . basename($this->path) . "), author {$this->getAuthor()}, description {$this->getDescription()}, length {$this->getLength()}, speed {$this->getSpeed()}, delay {$this->getDelay()}, height {$this->getSongHeight()}, count ".count($this->getLayerHashMap());
     }
 
 }

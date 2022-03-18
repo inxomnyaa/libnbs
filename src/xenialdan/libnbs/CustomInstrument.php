@@ -7,17 +7,17 @@ namespace xenialdan\libnbs;
 class CustomInstrument
 {
     /** @var int The instruments index */
-    public $index;
+    public int $index;
     /** @var string The name of the instrument. */
-    public $name;
+    public string $name;
     /** @var string The sound file of the instrument (just the filename, not the path). */
-    public $soundFileName;
+    public string $soundFileName;
     /** @var string Sound name */
-    public $sound = "";
+    public string $sound = "";
     /** @var int The pitch of the sound file. Just like the note blocks, this ranges from 0-87. Default is 45. */
-    public $pitch;
+    public int $pitch;
     /** @var bool Whether the piano should automatically press keys with this instrument when the marker passes them (0 or 1). */
-    public $pressKey;
+    public bool $pressKey;
 
     /**
      * Creates a CustomInstrument
