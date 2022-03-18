@@ -64,7 +64,7 @@ class Song
      * Gets all Layers in this Song and their index
      * @return Array of Layers and their index
      */
-    public function getLayers(): array
+    public function getLayerHashMap(): array
     {
         return $this->layers;
     }
