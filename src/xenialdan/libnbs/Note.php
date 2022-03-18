@@ -8,9 +8,9 @@ namespace xenialdan\libnbs;
 class Note
 {
     /** @var int */
-    public $instrument;
+    public int $instrument;
     /** @var int */
-    public $key;
+     public int $key;
 
     /**
      * Note constructor.

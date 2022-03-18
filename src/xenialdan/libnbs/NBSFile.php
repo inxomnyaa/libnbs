@@ -10,9 +10,8 @@
 
 namespace xenialdan\libnbs;
 
-use Ds\Map;
 use pocketmine\utils\BinaryDataException;
-use pocketmine\utils\Utils;
+use pocketmine\utils\Filesystem;
 use SplFileObject;
 
 class NBSFile
@@ -67,11 +66,11 @@ class NBSFile
     public static function parse(string $path): ?Song
     {
         // int => Layer
-        $layerHashMap = new Map();
+        $layers = [];
 
         ### HEADER ###
         try {
-            $path = Utils::cleanPath(realpath($path));
+            $path = Filesystem::cleanPath(realpath($path));
             $file = new SplFileObject($path);
             $file->rewind();
             //TODO test
@@ -139,7 +138,7 @@ class NBSFile
                 $instrument = $binaryStream->getByte();
                 $key = $binaryStream->getByte();
                 //TODO custom instrument
-                self::setNote($layer, $tick, $instrument, $key, $layerHashMap);
+                self::setNote($layer, $tick, $instrument, $key, $layers);
                 if ($nbsVersion >= 4) {
                     /*$velocity = */
                     $binaryStream->getByte();
@@ -157,7 +156,7 @@ class NBSFile
         ### LAYER INFO ###
             for ($i = 0; $i < $songHeight; $i++) {
                 /** @var Layer $layer */
-                $layer = $layerHashMap->get($i, null);
+                $layer = $layers[$i] ?? null;
 
                 $name = $binaryStream->getString();
                 if ($nbsVersion >= 4) {
@@ -195,7 +194,7 @@ class NBSFile
                 firstcustominstrument += firstcustominstrumentdiff;
             }
             */
-            return new Song($speed, $layerHashMap, $songHeight, $length, $title, $author, $description, $path, $firstCustomInstrument, $customInstrumentsArray);
+            return new Song($speed, $layers, $songHeight, $length, $title, $author, $description, $path, $firstCustomInstrument, $customInstrumentsArray);
             /*} catch (\LogicException $e) {
                 Server::getInstance()->getLogger()->logException($e);
             } catch (\RuntimeException $e) {
@@ -221,14 +220,14 @@ class NBSFile
      * @param int $ticks
      * @param int $instrument
      * @param int $key
-     * @param Map $layerHashMap
+     * @param array $layers
      */
-    private static function setNote(int $layerIndex, int $ticks, int $instrument, int $key, Map &$layerHashMap): void
+    private static function setNote(int $layerIndex, int $ticks, int $instrument, int $key, array &$layers): void
     {
-        $layer = $layerHashMap->get($layerIndex, new Layer("", 100));
+        $layer = $layers[$layerIndex] ?? new Layer("", 100);
         #if ($layer === null) {
         #    $layer = new Layer();
-        if (!$layerHashMap->hasKey($layerIndex)) $layerHashMap->put($layerIndex, $layer);
+        if (!isset($layers[$layerIndex])) $layers[$layerIndex] = $layer;
         #}
         $layer->setNote($ticks, new Note($instrument, $key));
     }

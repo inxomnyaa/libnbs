@@ -2,49 +2,46 @@
 
 namespace xenialdan\libnbs;
 
-use Ds\Map;
-
 /**
  * Represents a series of notes in Note Block Studio.
  * A Layer can have a maximum of one note per tick (20 ticks a second)
  */
 class Layer
 {
-    /** @var Map */
-    public $notesAtTicks;
+    /** @var array<int,Note> */
+    public array $notesAtTicks = [];
     /** @var string */
-    public $name = "";
+    public string $name = "";
     /** @var int */
-    public $volume = 100;
+    public int $volume = 100;
     /**
      * This is from OpenNoteBlockStudio
      * How much this layer is panned to the left/right. 0 is 2 blocks right, 100 is centre, 200 is 2 blocks left
      * @var int
      */
-    public $stereo = 100;
+    public int $stereo = 100;
 
     public function __construct(string $name, int $volume, int $stereo = 100)
     {
-        $this->notesAtTicks = new Map();
         $this->name = $name;
         $this->volume = $volume;
         $this->stereo = $stereo;
     }
 
     /**
-     * Gets the notes in the Layer with the tick they are created as a hash map
-     * @return Map of notes with the tick they are played at
+     * Gets the notes in the Layer with the tick they are created as an array
+     * @return Array of notes with the tick they are played at
      */
-    public function getNotesAtTicks(): Map
+    public function getNotesAtTicks(): array
     {
         return $this->notesAtTicks;
     }
 
     /**
-     * Sets the notes in the Layer with the tick they are created as a hash map
-     * @param Map $notesAtTicks
+     * Sets the notes in the Layer with the tick they are created as an array
+     * @param array $notesAtTicks
      */
-    public function setNotesAtTicks(Map $notesAtTicks): void
+    public function setNotesAtTicks(array $notesAtTicks): void
     {
         $this->notesAtTicks = $notesAtTicks;
     }
@@ -74,7 +71,7 @@ class Layer
      */
     public function getNote(int $tick): ?Note
     {
-        return $this->notesAtTicks->get($tick, null);
+        return $this->notesAtTicks[$tick] ?? null;
     }
 
     /**
@@ -84,7 +81,7 @@ class Layer
      */
     public function setNote(int $tick, Note $note): void
     {
-        $this->notesAtTicks->put($tick, $note);
+        $this->notesAtTicks[$tick] = $note;
     }
 
     /**
