@@ -162,7 +162,7 @@ class Song
 
     public function __toString()
     {
-        return "Song {$this->getTitle()} (" . basename($this->path) . "), author {$this->getAuthor()}, description {$this->getDescription()}, length {$this->getLength()}, speed {$this->getSpeed()}, delay {$this->getDelay()}, height {$this->getSongHeight()}, count ".count($this->getLayers());
+        return "Song {$this->getTitle()} (" . basename($this->path) . "), author {$this->getAuthor()}, description {$this->getDescription()}, length {$this->getLength()}, speed {$this->getSpeed()}, delay {$this->getDelay()}, height {$this->getSongHeight()}, count ".count($this->getLayerHashMap());
     }
 
 }
