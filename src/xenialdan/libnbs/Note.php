@@ -10,7 +10,7 @@ class Note
     /** @var int */
     public int $instrument;
     /** @var int */
-     public int $key;
+    public int $key;
 
     /**
      * Note constructor.
