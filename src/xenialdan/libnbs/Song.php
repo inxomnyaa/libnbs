@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace xenialdan\libnbs;
 
+use function basename;
+
 /**
  * Represents a Note Block Studio project
  */
@@ -97,6 +99,13 @@ class Song{
 	 * @return int $index
 	 */
 	public function getFirstCustomInstrumentIndex() : int{ return $this->firstCustomInstrumentIndex; }
+
+	/**
+	 * Gets the Songs title (or the song's filename) and the authors if any
+	 */
+	public function getSongTitleAndAuthorInfo() : string{ return $this->getTitleOrFilename() . (empty($this->getAuthor()) ? "" : " by " . $this->getAuthor()); }
+
+	public function getTitleOrFilename() : string{ return mb_scrub((empty($this->getTitle()) ? basename($this->path, ".nbs") : $this->getTitle()), 'UTF-8'); }
 
 	public function __toString() : string{ return "Song {$this->getTitle()} (" . basename($this->path) . "), author {$this->getAuthor()}, description {$this->getDescription()}, length {$this->getLength()}, speed {$this->getSpeed()}, delay {$this->getDelay()}, height {$this->getSongHeight()}, count " . count($this->layerHashMap); }
 }
