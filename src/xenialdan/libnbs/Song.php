@@ -8,7 +8,7 @@ namespace xenialdan\libnbs;
  * Represents a Note Block Studio project
  */
 class Song{
-	private int $delay;
+	private float $delay;
 
 	/**
 	 * Song constructor.

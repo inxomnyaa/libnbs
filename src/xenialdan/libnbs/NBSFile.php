@@ -10,14 +10,12 @@
 
 namespace xenialdan\libnbs;
 
-use Exception;
 use JsonSchema\Exception\ResourceNotFoundException;
 use pocketmine\utils\BinaryDataException;
 use pocketmine\utils\Filesystem;
-use RuntimeException;
 use SplFileObject;
-use xenialdan\PocketRadio\Loader;
 use function realpath;
+use function var_dump;
 
 class NBSFile{
 	const INSTRUMENT_PIANO = 0;//0 = Piano (air)
@@ -46,158 +44,140 @@ class NBSFile{
 	 *
 	 * @param string $path path to the .nbs file
 	 *
-	 * @return null|Song object representing the given .nbs file
-	 * @throws RuntimeException
+	 * @return Song object representing the given .nbs file
+	 * @throws ResourceNotFoundException|BinaryDataException
 	 * @see Song
 	 */
-	public static function parse(string $path) : ?Song{
+	public static function parse(string $path) : Song{
 		// int => Layer
 		/** @phpstan-var array<int,Layer> $layerHashMap */
 		$layerHashMap = [];
 
 		### HEADER ###
-		try{
-			$path = Filesystem::cleanPath(realpath($path));
-			$file = new SplFileObject($path);
-			$file->rewind();
-			//TODO test
-			$fread = $file->fread($file->getSize());
-			if($fread === false) throw new ResourceNotFoundException("Could not read file $path");
-			$binaryStream = new NBSBinaryStream($fread);
+		$path = Filesystem::cleanPath(realpath($path));
+		$file = new SplFileObject($path);
+		$file->rewind();
+		//TODO test
+		$fread = $file->fread($file->getSize());
+		if($fread === false) throw new ResourceNotFoundException("Could not read file $path");
+		$binaryStream = new NBSBinaryStream($fread);
 
-			$file = null;
-			unset($file);
-			//
-			$length = $binaryStream->getLShort();
-			$firstCustomInstrument = 10;
-			$nbsVersion = 0;
-			if($length === 0){
-				$nbsVersion = $binaryStream->getByte();
-				$firstCustomInstrument = $binaryStream->getByte();
-				if($nbsVersion >= 3)
-					$length = $binaryStream->getLShort();
-			}
-			$songHeight = $binaryStream->getLShort();
-			$title = $binaryStream->getString();
-			$author = $binaryStream->getString();
-			/*$originalAuthor = */
-			$binaryStream->getString();
-			$description = $binaryStream->getString();
-			$speed = $binaryStream->getLShort() / 100;
-			/*$autoSaving = */
-			$binaryStream->getByte();
-			/*$autoSavingDuration = */
-			$binaryStream->getByte();
-			/*$timeSignature = */
-			$binaryStream->getByte();
-			/*$minutesSpent = */
-			$binaryStream->getInt();
-			/*$leftClicks = */
-			$binaryStream->getInt();
-			/*$rightClicks = */
-			$binaryStream->getInt();
-			/*$blocksAdded = */
-			$binaryStream->getInt();
-			/*$blocksRemoved = */
-			$binaryStream->getInt();
-			/*$importedFileName = */
-			$binaryStream->getString();
-			if($nbsVersion >= 4){
-				/*$loopOnOff = */
-				$binaryStream->getByte();
-				/*$maxLoopCount = */
-				$binaryStream->getByte();
-				/*$loopStartTick = */
-				$binaryStream->getLShort();
-			}
-
-			### DATA ###
-			$tick = -1;
-			while(true){
-				$jumpTicks = $binaryStream->getLShort();
-				if($jumpTicks === 0) break;
-				$tick += $jumpTicks;
-				$layer = -1;
-				while(true){
-					$jumpLayers = $binaryStream->getLShort();
-					if($jumpLayers === 0) break;
-					$layer += $jumpLayers;
-					$instrument = $binaryStream->getByte();
-					$key = $binaryStream->getByte();
-					//TODO custom instrument
-					self::setNote($layer, $tick, $instrument, $key, $layerHashMap);
-					if($nbsVersion >= 4){
-						/*$velocity = */
-						$binaryStream->getByte();
-						/*$panning = */
-						$binaryStream->getByte();
-						/*$pitch = */
-						$binaryStream->getSignedLShort();
-					}
-				}
-			}
-			if($nbsVersion > 0 && $nbsVersion < 3){
-				$length = $tick;
-			}
-
-			### LAYER INFO ###
-			for($i = 0; $i < $songHeight; $i++){
-				$layer = $layerHashMap[$i] ?? null;
-
-				$name = $binaryStream->getString();
-				if($nbsVersion >= 4){
-					/*$layerLock = */
-					$binaryStream->getByte();
-				}
-				$volume = $binaryStream->getByte();
-				$stereo = 100;
-
-				if($nbsVersion >= 2){
-					$stereo = $binaryStream->getByte();
-				}
-				if($layer !== null){
-					$layer->setName($name);
-					$layer->setVolume($volume);
-					$layer->setStereo($stereo);
-				}
-			}
-
-			$countCustom = $binaryStream->getByte();
-			$customInstrumentsArray = [];
-			for($index = 0; $index < $countCustom; $index++){
-				$name = $binaryStream->getString();
-				$soundFile = $binaryStream->getString();
-				$pitch = $binaryStream->getByte();
-				$pressKey = $binaryStream->getByte() === 1;
-				$customInstrumentsArray[$index] = new CustomInstrument($index, $name, $soundFile, $pitch, $pressKey);
-			}
-			/*TODO customdiff
-			if (firstcustominstrumentdiff < 0){
-				ArrayList<CustomInstrument> customInstruments = CompatibilityUtils.getVersionCustomInstrumentsForSong(firstcustominstrument);
-				customInstruments.addAll(Arrays.asList(customInstrumentsArray));
-				customInstrumentsArray = customInstruments.toArray(customInstrumentsArray);
-			} else {
-				firstcustominstrument += firstcustominstrumentdiff;
-			}
-			*/
-			return new Song($speed, $layerHashMap, $songHeight, $length, $title, $author, $description, $path, $firstCustomInstrument, $customInstrumentsArray);
-			/*} catch (\LogicException $e) {
-				Server::getInstance()->getLogger()->logException($e);
-			} catch (\RuntimeException $e) {
-				Server::getInstance()->getLogger()->logException($e);
-			*/
-		}catch(BinaryDataException $e){
-			$fileName = $path;
-			if(isset($file) && $file != null){
-				$fileName = $file->getFilename();
-			}
-			#Server::getInstance()->getLogger()->error("Song is corrupted: " . $fileName);
-			print "Song $fileName is corrupted";
-			Loader::getInstance()->getLogger()->logException($e);
-		}catch(Exception $e){
-			Loader::getInstance()->getLogger()->logException($e);
+		$file = null;
+		unset($file);
+		//
+		$length = $binaryStream->getLShort();
+		$firstCustomInstrument = 10;
+		$nbsVersion = 0;
+		if($length === 0){
+			$nbsVersion = $binaryStream->getByte();
+			$firstCustomInstrument = $binaryStream->getByte();
+			if($nbsVersion >= 3)
+				$length = $binaryStream->getLShort();
 		}
-		return null;
+		$songHeight = $binaryStream->getLShort();
+		$title = $binaryStream->getString();
+		$author = $binaryStream->getString();
+		/*$originalAuthor = */
+		$binaryStream->getString();
+		$description = $binaryStream->getString();
+		$speed = $binaryStream->getLShort() / 100;
+		/*$autoSaving = */
+		$binaryStream->getByte();
+		/*$autoSavingDuration = */
+		$binaryStream->getByte();
+		/*$timeSignature = */
+		$binaryStream->getByte();
+		/*$minutesSpent = */
+		$binaryStream->getInt();
+		/*$leftClicks = */
+		$binaryStream->getInt();
+		/*$rightClicks = */
+		$binaryStream->getInt();
+		/*$blocksAdded = */
+		$binaryStream->getInt();
+		/*$blocksRemoved = */
+		$binaryStream->getInt();
+		/*$importedFileName = */
+		$binaryStream->getString();
+		if($nbsVersion >= 4){
+			/*$loopOnOff = */
+			$binaryStream->getByte();
+			/*$maxLoopCount = */
+			$binaryStream->getByte();
+			/*$loopStartTick = */
+			$binaryStream->getLShort();
+		}
+
+		### DATA ###
+		$tick = -1;
+		while(true){
+			$jumpTicks = $binaryStream->getLShort();
+			if($jumpTicks === 0) break;
+			$tick += $jumpTicks;
+			$layer = -1;
+			while(true){
+				$jumpLayers = $binaryStream->getLShort();
+				if($jumpLayers === 0) break;
+				$layer += $jumpLayers;
+				$instrument = $binaryStream->getByte();
+				$key = $binaryStream->getByte();
+				//TODO custom instrument
+				self::setNote($layer, $tick, $instrument, $key, $layerHashMap);
+				if($nbsVersion >= 4){
+					/*$velocity = */
+					$binaryStream->getByte();
+					/*$panning = */
+					$binaryStream->getByte();
+					/*$pitch = */
+					$binaryStream->getSignedLShort();
+				}
+			}
+		}
+		if($nbsVersion > 0 && $nbsVersion < 3){
+			$length = $tick;
+		}
+
+		### LAYER INFO ###
+		for($i = 0; $i < $songHeight; $i++){
+			$layer = $layerHashMap[$i] ?? null;
+
+			$name = $binaryStream->getString();
+			if($nbsVersion >= 4){
+				/*$layerLock = */
+				$binaryStream->getByte();
+			}
+			$volume = $binaryStream->getByte();
+			$stereo = 100;
+
+			if($nbsVersion >= 2){
+				$stereo = $binaryStream->getByte();
+			}
+			if($layer !== null){
+				$layer->setName($name);
+				$layer->setVolume($volume);
+				$layer->setStereo($stereo);
+			}
+		}
+
+		$countCustom = $binaryStream->getByte();
+		$customInstrumentsArray = [];
+		for($index = 0; $index < $countCustom; $index++){
+			$name = $binaryStream->getString();
+			$soundFile = $binaryStream->getString();
+			$pitch = $binaryStream->getByte();
+			$pressKey = $binaryStream->getByte() === 1;
+			$customInstrumentsArray[$index] = new CustomInstrument($index, $name, $soundFile, $pitch, $pressKey);
+		}
+		/*TODO customdiff
+		if (firstcustominstrumentdiff < 0){
+			ArrayList<CustomInstrument> customInstruments = CompatibilityUtils.getVersionCustomInstrumentsForSong(firstcustominstrument);
+			customInstruments.addAll(Arrays.asList(customInstrumentsArray));
+			customInstrumentsArray = customInstruments.toArray(customInstrumentsArray);
+		} else {
+			firstcustominstrument += firstcustominstrumentdiff;
+		}
+		*/
+		return new Song($speed, $layerHashMap, $songHeight, $length, $title, $author, $description, $path, $firstCustomInstrument, $customInstrumentsArray);
 	}
 
 	/**
