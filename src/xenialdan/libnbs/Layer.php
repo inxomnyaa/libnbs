@@ -10,6 +10,9 @@ class Layer{
 	/** @var array<int,Note> */
 	private array $notesAtTicks = [];
 
+	/**
+	 * @param int $stereo This is from OpenNoteBlockStudio. How much this layer is panned to the left/right. 0 is 2 blocks right, 100 is centre, 200 is 2 blocks left
+	 */
 	public function __construct(public string $name = "", public int $volume = 100, public int $stereo = 100){
 	}
 
@@ -75,5 +78,6 @@ class Layer{
 
 	public function getStereo() : int{ return $this->stereo; }
 
+	/** @param int $stereo This is from OpenNoteBlockStudio. How much this layer is panned to the left/right. 0 is 2 blocks right, 100 is centre, 200 is 2 blocks left */
 	public function setStereo(int $stereo) : void{ $this->stereo = $stereo; }
 }

@@ -30,23 +30,23 @@ class CustomInstrument{
 	 * Gets index of CustomInstrument
 	 * @return int index
 	 */
-	public function getIndex() : int{		return $this->index;	}
+	public function getIndex() : int{ return $this->index; }
 
 	/**
 	 * Gets name of CustomInstrument
 	 * @return string $name
 	 */
-	public function getName() : string{		return $this->name;	}
+	public function getName() : string{ return $this->name; }
 
 	/**
 	 * Gets file name of the sound
 	 * @return string file name
 	 */
-	public function getSoundFileName() : string{		return $this->soundFileName;	}
+	public function getSoundFileName() : string{ return $this->soundFileName; }
 
 	/**
 	 * Gets the resource pack sound_definitions entry for this CustomInstrument
 	 * @return string $resourceEntry
 	 */
-	public function getSound() : string{		return $this->sound;	}
+	public function getSound() : string{ return $this->sound; }
 }
