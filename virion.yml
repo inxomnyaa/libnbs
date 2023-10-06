@@ -1,6 +1,6 @@
 name: libnbs
 version: 4.2.0
 antigen: xenialdan\libnbs
-api: [4.0.0]
-php: [8.0]
+api: [5.0.0]
+php: [8.1]
 author: XenialDan
