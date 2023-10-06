@@ -8,7 +8,7 @@
  * https://www.minecraftforum.net/forums/mapping-and-modding-java-edition/resource-packs/resource-pack-discussion/1255570-making-music-with-playsound
  */
 
-namespace xenialdan\libnbs;
+namespace inxomnyaa\libnbs;
 
 use JsonSchema\Exception\ResourceNotFoundException;
 use pocketmine\utils\BinaryDataException;

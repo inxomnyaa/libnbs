@@ -1,6 +1,6 @@
 <?php
 
-namespace xenialdan\libnbs;
+namespace inxomnyaa\libnbs;
 
 /**
  * Represents a note played; contains the instrument and the key

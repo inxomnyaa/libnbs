@@ -1,6 +1,6 @@
 name: libnbs
-version: 4.2.1
-antigen: xenialdan\libnbs
+version: 4.2.2
+antigen: inxomnyaa\libnbs
 api: [5.0.0]
 php: [8.1]
-author: XenialDan
+author: inxomnyaa

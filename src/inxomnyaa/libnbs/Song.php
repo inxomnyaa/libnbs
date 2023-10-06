@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace xenialdan\libnbs;
+namespace inxomnyaa\libnbs;
 
 use function basename;
 

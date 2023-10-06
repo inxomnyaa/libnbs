@@ -1,6 +1,6 @@
 <?php
 
-namespace xenialdan\libnbs;
+namespace inxomnyaa\libnbs;
 
 /**
  * Represents a series of notes in Note Block Studio.

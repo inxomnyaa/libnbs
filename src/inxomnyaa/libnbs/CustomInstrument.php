@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace xenialdan\libnbs;
+namespace inxomnyaa\libnbs;
 
 class CustomInstrument{
 	/** @var string The sound file of the instrument (just the filename, not the path). */
